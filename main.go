@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -19,11 +20,15 @@ type LogLine struct {
 }
 
 func (l *LogLine) String() string {
-	return l.Date.Format(time.RFC3339) + ", " + l.Message
+	return l.Date.Format(time.RFC3339) + "," + l.Message
 }
 
 func (l *LogLine) After(other LogLine) bool {
 	return l.Date.After(other.Date)
+}
+
+func (l *LogLine) Sort() {
+
 }
 
 func Hello() string {
@@ -31,8 +36,7 @@ func Hello() string {
 }
 
 func CloseOpenedFiles(files map[string]*os.File) {
-	for fname, fd := range files {
-		log.Println("Closing file", fname)
+	for _, fd := range files {
 		fd.Close()
 	}
 }
@@ -51,7 +55,7 @@ func Aggregate() string {
 	// create a structure to track files
 	fileDescriptors := make(map[string]*os.File, numFiles)
 	fileChunks := make(map[string]string, numFiles)
-	loglines := make(map[string]interface{}, numFiles)
+	logLines := make([]LogLine, 0)
 
 	// open all files and track its file descriptors
 	for _, fname := range files {
@@ -67,8 +71,8 @@ func Aggregate() string {
 	allDone := false
 	for times := int64(0); !allDone; times++ {
 		loadChunks(fileDescriptors, fileChunks, chunkSize, times)
-		for fname, content := range fileChunks {
-			parsedLines := make([]LogLine, 0)
+		for _, content := range fileChunks {
+			//parsedLines := make([]LogLine, 0)
 			for _, line := range strings.Split(content, "\n") {
 				parts := strings.Split(line, ",")
 				date, _ := time.Parse(time.RFC3339, parts[0])
@@ -76,14 +80,22 @@ func Aggregate() string {
 				if len(parts) > 1 {
 					message = strings.Join(parts[1:], "")
 				}
-				parsedLines = append(parsedLines, LogLine{date, message})
+				logLines = append(logLines, LogLine{date, message})
 			}
 			//log.Println("parsed:", parsedLines)
-			loglines[fname] = parsedLines
+			//loglines[fname] = parsedLines
 			//log.Println(fname, content)
 		}
 
 		allDone = AllChunksNil(&fileChunks)
+	}
+
+	sort.Slice(logLines, func(i, j int) bool {
+		return logLines[j].Date.After(logLines[i].Date)
+	})
+
+	for _, line := range logLines[numFiles:] {
+		fmt.Println(line.String())
 	}
 	return ""
 }
@@ -97,23 +109,19 @@ func loadChunks(descriptors map[string]*os.File, files map[string]string, size i
 	for fname, descriptor := range descriptors {
 		buffer := make([]byte, size)
 
-		//for {
 		// read content to buffer
 		readTotal, err := descriptor.ReadAt(buffer, size*times)
 		if err != nil {
 			if err != io.EOF {
 				fmt.Println(err)
 			}
-			// ignore
 		}
 		fileContent := string(buffer[:readTotal])
 		if fileContent == "" { // File was already empty
 			fileContent = "EOF"
 		}
 		// print content from buffer
-		fmt.Println("fc", fileContent)
 		files[fname] = fileContent
-		//}
 	}
 }
 
@@ -141,8 +149,8 @@ func getMaxChunkSize() (int, int64) {
 
 func main() {
 
-	numFiles, chunkSize := getMaxChunkSize()
-	log.Printf("Max chunk size: %d bytes, which is %d max RAM GBs, divided into %d files \n", chunkSize, MAXMEMORYGB, numFiles)
+	//numFiles, chunkSize := getMaxChunkSize()
+	//log.Printf("Max chunk size: %d bytes, which is %d max RAM GBs, divided into %d files \n", chunkSize, MAXMEMORYGB, numFiles)
 
 	Aggregate()
 }
