@@ -17,8 +17,12 @@ type LogLine struct {
 	Message string
 }
 
-func (l LogLine) String() string {
+func (l *LogLine) String() string {
 	return l.Date.Format(time.RFC3339) + ", " + l.Message
+}
+
+func (l *LogLine) After(other LogLine) bool {
+	return l.Date.After(other.Date)
 }
 
 func Hello() string {
