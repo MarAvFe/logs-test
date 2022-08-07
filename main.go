@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -50,6 +51,7 @@ func Aggregate() string {
 	// create a structure to track files
 	fileDescriptors := make(map[string]*os.File, numFiles)
 	fileChunks := make(map[string]string, numFiles)
+	loglines := make(map[string]interface{}, numFiles)
 
 	// open all files and track its file descriptors
 	for _, fname := range files {
@@ -66,11 +68,28 @@ func Aggregate() string {
 	for times := int64(0); !allDone; times++ {
 		loadChunks(fileDescriptors, fileChunks, chunkSize, times)
 		for fname, content := range fileChunks {
-			log.Println(fname, content)
+			parsedLines := make([]LogLine, 0)
+			for _, line := range strings.Split(content, "\n") {
+				parts := strings.Split(line, ",")
+				date, _ := time.Parse(time.RFC3339, parts[0])
+				var message string
+				if len(parts) > 1 {
+					message = strings.Join(parts[1:], "")
+				}
+				parsedLines = append(parsedLines, LogLine{date, message})
+			}
+			//log.Println("parsed:", parsedLines)
+			loglines[fname] = parsedLines
+			//log.Println(fname, content)
 		}
+
 		allDone = AllChunksNil(&fileChunks)
 	}
 	return ""
+}
+
+func ChunkLines(chunk *string) []LogLine {
+	return nil
 }
 
 func loadChunks(descriptors map[string]*os.File, files map[string]string, size int64, times int64) {
