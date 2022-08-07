@@ -11,6 +11,10 @@ func Hello() string {
 	return "Hello, world"
 }
 
+func Aggregate() string {
+	return ""
+}
+
 func main() {
 	// get file from terminal
 	inputFile := os.Args[1]
