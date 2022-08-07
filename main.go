@@ -49,11 +49,13 @@ func Aggregate() string {
 	}
 	defer CloseOpenedFiles(fileDescriptors) // Protect against memory leaks
 
-	for !AllChunksNil(&fileChunks) {
+	allDone := false
+	for !allDone {
 		loadChunks(fileDescriptors, fileChunks, chunkSize)
 		for fname, content := range fileChunks {
 			log.Println(fname, content)
 		}
+		allDone = AllChunksNil(&fileChunks)
 	}
 	return ""
 }
