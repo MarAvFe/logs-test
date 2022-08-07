@@ -59,12 +59,12 @@ func Aggregate() string {
 }
 
 func loadChunks(descriptors map[string]*os.File, files map[string]string, size int64) {
-	for fname, _ := range files {
+	for fname, descriptor := range descriptors {
 		buffer := make([]byte, size)
 
 		for {
 			// read content to buffer
-			readTotal, err := descriptors[fname].Read(buffer)
+			readTotal, err := descriptor.Read(buffer)
 			if err != nil {
 				if err != io.EOF {
 					fmt.Println(err)
@@ -76,7 +76,7 @@ func loadChunks(descriptors map[string]*os.File, files map[string]string, size i
 				fileContent = "EOF"
 			}
 			// print content from buffer
-			fmt.Println(fileContent)
+			fmt.Println("fc", fileContent)
 			files[fname] = fileContent
 		}
 	}
