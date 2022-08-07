@@ -41,7 +41,7 @@ func CloseOpenedFiles(files map[string]*os.File) {
 	}
 }
 
-func Aggregate() string {
+func Aggregate() {
 
 	// get values to avoid memory overflow. mem limits
 	numFiles, chunkSize := getMaxChunkSize()
@@ -70,6 +70,7 @@ func Aggregate() string {
 
 	allDone := false
 	for times := int64(0); !allDone; times++ {
+		allDone = AllChunksNil(&fileChunks)
 		loadChunks(fileDescriptors, fileChunks, chunkSize, times)
 		for _, content := range fileChunks {
 			//parsedLines := make([]LogLine, 0)
@@ -87,21 +88,15 @@ func Aggregate() string {
 			//log.Println(fname, content)
 		}
 
-		allDone = AllChunksNil(&fileChunks)
+		sort.Slice(logLines, func(i, j int) bool {
+			return logLines[j].Date.After(logLines[i].Date)
+		})
+
+		for _, line := range logLines {
+			fmt.Println(line.String())
+		}
+
 	}
-
-	sort.Slice(logLines, func(i, j int) bool {
-		return logLines[j].Date.After(logLines[i].Date)
-	})
-
-	for _, line := range logLines[numFiles:] {
-		fmt.Println(line.String())
-	}
-	return ""
-}
-
-func ChunkLines(chunk *string) []LogLine {
-	return nil
 }
 
 func loadChunks(descriptors map[string]*os.File, files map[string]string, size int64, times int64) {
@@ -122,6 +117,7 @@ func loadChunks(descriptors map[string]*os.File, files map[string]string, size i
 		}
 		// print content from buffer
 		files[fname] = fileContent
+		// SOURCE: https://www.golinuxcloud.com/golang-read-a-file-methods/
 	}
 }
 
@@ -154,5 +150,3 @@ func main() {
 
 	Aggregate()
 }
-
-// SOURCE: https://www.golinuxcloud.com/golang-read-a-file-methods/
