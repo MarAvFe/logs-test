@@ -26,7 +26,7 @@ func CloseOpenedFiles(files map[string]*os.File) {
 func Aggregate() string {
 
 	// get values to avoid memory overflow. mem limits
-	numFiles, _ := getMaxChunkSize()
+	numFiles, chunkSize := getMaxChunkSize()
 
 	// read all logs to aggregate
 	files, err := ioutil.ReadDir(LOGSPATH)
@@ -36,6 +36,7 @@ func Aggregate() string {
 
 	// create a structure to track files
 	fileDescriptors := make(map[string]*os.File, numFiles)
+	fileChunks := make(map[string]string, numFiles)
 
 	// open all files and track its file descriptors
 	for _, fname := range files {
@@ -48,7 +49,46 @@ func Aggregate() string {
 	}
 	defer CloseOpenedFiles(fileDescriptors) // Protect against memory leaks
 
+	for !AllChunksNil(&fileChunks) {
+		loadChunks(fileDescriptors, fileChunks, chunkSize)
+		for fname, content := range fileChunks {
+			log.Println(fname, content)
+		}
+	}
 	return ""
+}
+
+func loadChunks(descriptors map[string]*os.File, files map[string]string, size int64) {
+	for fname, _ := range files {
+		buffer := make([]byte, size)
+
+		for {
+			// read content to buffer
+			readTotal, err := descriptors[fname].Read(buffer)
+			if err != nil {
+				if err != io.EOF {
+					fmt.Println(err)
+				}
+				break
+			}
+			fileContent := string(buffer[:readTotal])
+			if fileContent == "" { // File was already empty
+				fileContent = "EOF"
+			}
+			// print content from buffer
+			fmt.Println(fileContent)
+			files[fname] = fileContent
+		}
+	}
+}
+
+func AllChunksNil(files *map[string]string) bool {
+	for _, chunk := range *files {
+		if chunk[0:3] != "EOF" {
+			return false
+		}
+	}
+	return true
 }
 
 func getMaxChunkSize() (int, int64) {
