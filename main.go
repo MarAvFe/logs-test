@@ -6,11 +6,20 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strconv"
+	"time"
 )
 
 const MAXMEMORYGB int = 1
 const LOGSPATH string = "./logs/"
+
+type LogLine struct {
+	Date    time.Time
+	Message string
+}
+
+func (l LogLine) String() string {
+	return l.Date.Format(time.RFC3339) + ", " + l.Message
+}
 
 func Hello() string {
 	return "Hello, world"
@@ -50,8 +59,8 @@ func Aggregate() string {
 	defer CloseOpenedFiles(fileDescriptors) // Protect against memory leaks
 
 	allDone := false
-	for !allDone {
-		loadChunks(fileDescriptors, fileChunks, chunkSize)
+	for times := int64(0); !allDone; times++ {
+		loadChunks(fileDescriptors, fileChunks, chunkSize, times)
 		for fname, content := range fileChunks {
 			log.Println(fname, content)
 		}
@@ -60,31 +69,33 @@ func Aggregate() string {
 	return ""
 }
 
-func loadChunks(descriptors map[string]*os.File, files map[string]string, size int64) {
+func loadChunks(descriptors map[string]*os.File, files map[string]string, size int64, times int64) {
+	//log.Println("loadChunks", descriptors, files, size, times)
 	for fname, descriptor := range descriptors {
 		buffer := make([]byte, size)
 
-		for {
-			// read content to buffer
-			readTotal, err := descriptor.Read(buffer)
-			if err != nil {
-				if err != io.EOF {
-					fmt.Println(err)
-				}
-				break
+		//for {
+		// read content to buffer
+		readTotal, err := descriptor.ReadAt(buffer, size*times)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println(err)
 			}
-			fileContent := string(buffer[:readTotal])
-			if fileContent == "" { // File was already empty
-				fileContent = "EOF"
-			}
-			// print content from buffer
-			fmt.Println("fc", fileContent)
-			files[fname] = fileContent
+			// ignore
 		}
+		fileContent := string(buffer[:readTotal])
+		if fileContent == "" { // File was already empty
+			fileContent = "EOF"
+		}
+		// print content from buffer
+		fmt.Println("fc", fileContent)
+		files[fname] = fileContent
+		//}
 	}
 }
 
 func AllChunksNil(files *map[string]string) bool {
+	//log.Println("\n\nallChunksNil", files)
 	for _, chunk := range *files {
 		if chunk[0:3] != "EOF" {
 			return false
@@ -101,7 +112,7 @@ func getMaxChunkSize() (int, int64) {
 
 	numFiles := len(files)
 	bytesinGB := 1000000000
-	chunkSize := int64((MAXMEMORYGB * bytesinGB) / numFiles)
+	chunkSize := int64((MAXMEMORYGB * bytesinGB) / (numFiles / 2)) // div2 because of structured values
 	return numFiles, chunkSize
 }
 
@@ -109,34 +120,6 @@ func main() {
 
 	numFiles, chunkSize := getMaxChunkSize()
 	log.Printf("Max chunk size: %d bytes, which is %d max RAM GBs, divided into %d files \n", chunkSize, MAXMEMORYGB, numFiles)
-
-	// get file from terminal
-	inputFile := "./logs/server-bc329xbv.log"
-	// declare chunk size
-	maxSz, _ := strconv.Atoi("10")
-	// read the whole content of file and pass it to file variable, in case of error pass it to err variable
-	file, err := os.Open(inputFile)
-	if err != nil {
-		fmt.Printf("Could not open the file due to this %s error \n", err)
-	}
-	defer file.Close()
-
-	// create buffer
-	b := make([]byte, maxSz)
-
-	for {
-		// read content to buffer
-		readTotal, err := file.Read(b)
-		if err != nil {
-			if err != io.EOF {
-				fmt.Println(err)
-			}
-			break
-		}
-		fileContent := string(b[:readTotal])
-		// print content from buffer
-		fmt.Println(fileContent)
-	}
 
 	Aggregate()
 }
