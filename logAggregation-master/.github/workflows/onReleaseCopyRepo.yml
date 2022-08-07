@@ -1,0 +1,22 @@
+
+name: Copy Repo On Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Copy Repo On Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: get release tag
+        id: get_release_tag
+        run: |
+          echo ::set-output name=CANDIDATE::${GITHUB_REF/refs\/tags\//}
+      - name: create new repo from template
+        run: |
+          curl -XPOST -u "${{ secrets.USERNAME }}:${{ secrets.TOKEN }}" -H "Accept: application/vnd.github.baptiste-preview+json"  -H "Content-Type: application/json" https://api.github.com/repos/armory-io/logAggregation/generate --data "{\"owner\": \"armory-io\", \"name\": \"logAggregation_${{ steps.get_release_tag.outputs.CANDIDATE }}\", \"description\": \"interview problem for ${{ steps.get_release_tag.outputs.CANDIDATE }}\", \"private\": true}"
+      - name: add candidate to repo
+        run: |
+          curl -XPUT -u "${{ secrets.USERNAME }}:${{ secrets.TOKEN }}" -H "Content-Type: application/json" https://api.github.com/repos/armory-io/logAggregation_${{ steps.get_release_tag.outputs.CANDIDATE }}/collaborators/${{ steps.get_release_tag.outputs.CANDIDATE }}
